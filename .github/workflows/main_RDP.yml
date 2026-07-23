@@ -32,6 +32,14 @@ jobs:
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member "thyo";
           Add-Content -Path $env:GITHUB_ENV -Value "RDP_CREDS=$password";
 
+      - name: Install Essential Apps (Chrome, VS Code, 7-Zip)
+        run: |
+          Write-Host "Menginstal Google Chrome, VS Code, dan 7-Zip secara otomatis..."
+          winget install -e --id Google.Chrome --accept-source-agreements --accept-package-agreements --silent --disable-interactivity
+          winget install -e --id Microsoft.VisualStudioCode --accept-source-agreements --accept-package-agreements --silent --disable-interactivity
+          winget install -e --id 7zip.7zip --accept-source-agreements --accept-package-agreements --silent --disable-interactivity
+        continue-on-error: true
+
       - name: Install Tailscale
         run: |
           $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi";
