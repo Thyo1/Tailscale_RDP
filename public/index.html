@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RDP Control Center</title>
+    <style>
+        :root {
+            --bg-main: #0b0f19;
+            --bg-card: #151b2b;
+            --border: #2a3441;
+            --text-main: #cbd5e1;
+            --text-muted: #64748b;
+            --accent: #38bdf8;
+            --success: #10b981;
+            --terminal-bg: #050505;
+            --terminal-text: #4ade80;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* HEADER */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-card);
+            padding: 15px 25px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+            color: #fff;
+            letter-spacing: 1px;
+        }
+        .status-badge {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            padding: 6px 15px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        /* GRID LAYOUT */
+        .grid-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 600px) {
+            .grid-cards { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+        .card-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+        }
+
+        /* DATA ROWS */
+        .data-row {
+            margin-bottom: 15px;
+        }
+        .data-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+        .data-value {
+            font-family: monospace;
+            font-size: 16px;
+            color: var(--accent);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.2);
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .copy-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .copy-btn:hover { background: var(--border); color: #fff; }
+
+        /* UPTIME */
+        .uptime-container {
+            text-align: center;
+            margin-top: 10px;
+        }
+        .uptime-time {
+            font-family: monospace;
+            font-size: 32px;
+            color: #facc15;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(250, 204, 21, 0.2);
+        }
+
+        /* TERMINAL LOG */
+        .terminal {
+            background: var(--terminal-bg);
+            border: 1px solid #1a1a1a;
+            border-radius: 8px;
+            padding: 15px;
+            height: 150px;
+            overflow-y: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            color: var(--terminal-text);
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+        }
+        .log-line { margin-bottom: 5px; }
+        .log-time { color: #888; margin-right: 10px; }
+        .log-warn { color: #facc15; }
+        .log-err { color: #ef4444; }
+        .log-info { color: #38bdf8; }
+
+        /* Custom Scrollbar for Terminal */
+        .terminal::-webkit-scrollbar { width: 8px; }
+        .terminal::-webkit-scrollbar-track { background: var(--terminal-bg); }
+        .terminal::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>RDP.CONTROL_CENTER</h1>
+            <div class="status-badge" id="statusBadge">
+                <div class="dot" id="statusDot"></div> <span id="statusText">CONNECTING...</span>
+            </div>
+        </div>
+
+        <!-- Grid Data -->
+        <div class="grid-cards">
+            <!-- Card 1: Credentials -->
+            <div class="card">
+                <div class="card-title">Access Credentials</div>
+                
+                <div class="data-row">
+                    <div class="data-label">Tailscale IP Address</div>
+                    <div class="data-value">
+                        <span id="ipData">Loading...</span>
+                        <button class="copy-btn" onclick="copyToClipboard('ipData', this)">COPY</button>
+                    </div>
+                </div>
+
+                <div class="data-row">
+                    <div class="data-label">Username</div>
+                    <div class="data-value">
+                        <span id="usrData" style="color: #fff;">Loading...</span>
+                    </div>
+                </div>
+
+                <div class="data-row">
+                    <div class="data-label">Password</div>
+                    <div class="data-value">
+                        <span id="passData">Loading...</span>
+                        <button class="copy-btn" onclick="copyToClipboard('passData', this)">COPY</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: System Info & Uptime -->
+            <div class="card">
+                <div class="card-title">System Metrics</div>
+                
+                <div class="data-row">
+                    <div class="data-label">Processor (CPU)</div>
+                    <div class="data-value" style="font-size: 13px; color: #cbd5e1;" id="cpuData">Loading...</div>
+                </div>
+
+                <div class="data-row">
+                    <div class="data-label">Allocated Memory (RAM)</div>
+                    <div class="data-value" style="font-size: 14px; color: #cbd5e1;" id="ramData">Loading...</div>
+                </div>
+
+                <div class="uptime-container">
+                    <div class="data-label" style="margin-top: 20px;">Server Uptime</div>
+                    <div class="uptime-time" id="uptimeCounter">00:00:00</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3: Live Terminal -->
+        <div class="card" style="padding: 10px;">
+            <div class="card-title" style="margin: 10px; border:none;">Live System Log</div>
+            <div class="terminal" id="terminalLog">
+                <!-- Logs will appear here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const terminal = document.getElementById('terminalLog');
+
+        // Fungsi untuk menambahkan teks ke terminal buatan
+        function addLog(message, type = '') {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('id-ID', { hour12: false });
+            
+            const logDiv = document.createElement('div');
+            logDiv.className = 'log-line ' + type;
+            logDiv.innerHTML = `<span class="log-time">[${timeStr}]</span> ${message}`;
+            
+            terminal.appendChild(logDiv);
+            terminal.scrollTop = terminal.scrollHeight; // Auto scroll ke bawah
+        }
+
+        // Fungsi Copy to Clipboard
+        function copyToClipboard(elementId, btnElement) {
+            const textToCopy = document.getElementById(elementId).innerText;
+            if (textToCopy === "Loading..." || textToCopy === "-") return;
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                const originalText = btnElement.innerText;
+                btnElement.innerText = "COPIED!";
+                btnElement.style.background = "#10b981";
+                btnElement.style.color = "#fff";
+                btnElement.style.border = "1px solid #10b981";
+                addLog(`Copied ${elementId === 'ipData' ? 'IP Address' : 'Password'} to clipboard.`, 'log-info');
+                
+                setTimeout(() => {
+                    btnElement.innerText = originalText;
+                    btnElement.style.background = "transparent";
+                    btnElement.style.color = "var(--text-main)";
+                    btnElement.style.border = "1px solid var(--border)";
+                }, 2000);
+            });
+        }
+
+        async function fetchRdpData() {
+            try {
+                addLog('Fetching latest server state from API...', 'log-info');
+                const response = await fetch('/api/get-rdp');
+                const rdpData = await response.json();
+
+                // Render Data
+                document.getElementById('ipData').innerText = rdpData.ip;
+                document.getElementById('usrData').innerText = rdpData.username;
+                document.getElementById('passData').innerText = rdpData.password;
+                document.getElementById('cpuData').innerText = rdpData.cpu;
+                document.getElementById('ramData').innerText = rdpData.ram;
+
+                // Update Status UI
+                const statusDot = document.getElementById('statusDot');
+                const statusText = document.getElementById('statusText');
+                
+                if (rdpData.status === "Offline" || rdpData.ip === "Menunggu data...") {
+                    statusDot.style.background = "#ef4444";
+                    statusDot.style.boxShadow = "0 0 10px #ef4444";
+                    statusText.innerText = "OFFLINE / STANDBY";
+                    statusText.style.color = "#ef4444";
+                    document.getElementById('uptimeCounter').innerText = "00:00:00";
+                    addLog('Server is currently offline or waiting for GitHub Actions.', 'log-warn');
+                    return;
+                } else {
+                    statusDot.style.background = "var(--success)";
+                    statusDot.style.boxShadow = "0 0 10px var(--success)";
+                    statusText.innerText = "ONLINE";
+                    statusText.style.color = "var(--success)";
+                    addLog(`Connection successful. IP: ${rdpData.ip}`);
+                }
+
+                // Kalkulasi Uptime
+                if (rdpData.startTime) {
+                    const startTimestamp = new Date(rdpData.startTime).getTime();
+                    
+                    if (window.uptimeInterval) clearInterval(window.uptimeInterval);
+
+                    window.uptimeInterval = setInterval(() => {
+                        const now = new Date().getTime();
+                        const difference = now - startTimestamp;
+
+                        const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+                        const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+                        const fmt = (num) => num.toString().padStart(2, '0');
+                        document.getElementById('uptimeCounter').innerText = `${fmt(hours)}:${fmt(minutes)}:${fmt(seconds)}`;
+                    }, 1000);
+                }
+            } catch (error) {
+                addLog(`Connection failed: ${error.message}`, 'log-err');
+                console.error("Gagal mengambil data RDP:", error);
+            }
+        }
+
+        // Inisialisasi
+        addLog('Initializing RDP Control Center...');
+        addLog('Establishing secure connection to backend...');
+        setTimeout(fetchRdpData, 1000); // Delay dikit biar animasi loading terminal kelihatan
+
+        // Auto-refresh tiap 30 detik
+        setInterval(fetchRdpData, 30000);
+    </script>
+</body>
+</html>
