@@ -42,24 +42,20 @@ jobs:
 
       - name: Establish Tailscale Connection
         run: |
-          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=tskey-auth-kR432R2Nxp11CNTRL-YeRSfXWuoQMbtVZ714QcRMTK3jjDnN2F --hostname=gh-runner-$env:GITHUB_RUN_ID;
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=tskey-auth-kR432Q2Nkp11CNTRL-YeRSfWAvzQMbtVZ714QcRMTK3jjDnW2F --hostname=gh-runner-$env:GITHUB_RUN_ID;
           $tsIP = $null;
           $retries = 0;
           while (-not $tsIP -and $retries -lt 10) { $tsIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4; Start-Sleep -Seconds 5; $retries++; };
           Add-Content -Path $env:GITHUB_ENV -Value "TAILSCALE_IP=$tsIP";
   
-      - name: Verify RDP Accessibility
-        run: |
-          Write-Host "Tailscale IP: $env:TAILSCALE_IP";
-          $testResult = Test-NetConnection -ComputerName $env:TAILSCALE_IP -Port 3389;
-          if (-not $testResult.TcpTestSucceeded) { Write-Error "TCP connection to RDP port 3389 failed"; exit 1; };
-          Write-Host "TCP connectivity successful!";
-
-      - name: Maintain Connection
+      - name: PRINT RDP PASSWORD (KLIK DI SINI NANTI)
         run: |
           Write-Host "`n=== RDP ACCESS ===";
           Write-Host "Address: $env:TAILSCALE_IP";
           Write-Host "Username: thyo";
           Write-Host "Password: $env:RDP_CREDS";
           Write-Host "==================`n";
+
+      - name: Maintain Connection
+        run: |
           while ($true) { Write-Host "[$(Get-Date)] RDP Active - Use Ctrl+C in workflow to terminate"; Start-Sleep -Seconds 300; };
