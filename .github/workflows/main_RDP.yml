@@ -14,7 +14,7 @@ jobs:
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force;
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force;
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0 -Force;
-          netsh advfirewall firewall delete rule name="RDP-Tailscale";
+          netsh advfirewall firewall delete rule name="RDP-Tailscale" -ErrorAction SilentlyContinue;
           netsh advfirewall firewall add rule name="RDP-Tailscale" dir=in action=allow protocol=TCP localport=3389;
           Restart-Service -Name TermService -Force;
 
@@ -32,6 +32,16 @@ jobs:
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member "thyo";
           Add-Content -Path $env:GITHUB_ENV -Value "RDP_CREDS=$password";
 
+      - name: Windows Optimization & Web Dev Ports
+        run: |
+          # Buka port untuk Web Development
+          netsh advfirewall firewall add rule name="Web-Dev-Ports" dir=in action=allow protocol=TCP localport=3000,5500,8080,80;
+          # Nyalakan Audio
+          Set-Service -Name "Audiosrv" -StartupType Automatic; Start-Service -Name "Audiosrv";
+          Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "fDisableAudioCapture" -Value 0 -Force;
+          # Matikan Animasi UI biar ringan
+          Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" -Name "VisualFXSetting" -Value 2 -Force;
+
       - name: Install Tailscale
         run: |
           $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi";
@@ -47,14 +57,37 @@ jobs:
           $retries = 0;
           while (-not $tsIP -and $retries -lt 10) { $tsIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4; Start-Sleep -Seconds 5; $retries++; };
           Add-Content -Path $env:GITHUB_ENV -Value "TAILSCALE_IP=$tsIP";
-  
-      - name: PRINT RDP PASSWORD (KLIK DI SINI NANTI)
+
+      - name: Send Data to Web Dashboard
         run: |
-          Write-Host "`n=== RDP ACCESS ===";
-          Write-Host "Address: $env:TAILSCALE_IP";
-          Write-Host "Username: thyo";
-          Write-Host "Password: $env:RDP_CREDS";
-          Write-Host "==================`n";
+          $ram = [math]::Round((Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property Capacity -Sum).Sum / 1GB)
+          $cpu = (Get-CimInstance Win32_Processor).Name
+          $startTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          
+          $payload = @{
+            status    = "Online"
+            ip        = $env:TAILSCALE_IP
+            username  = "thyo"
+            password  = $env:RDP_CREDS
+            cpu       = $cpu
+            ram       = "$ram GB"
+            startTime = $startTime
+          } | ConvertTo-Json
+          
+          Write-Host "Mengirim data JSON ke server Railway..."
+          
+          # Kirim request POST ke web kamu yang ada di Railway
+          Invoke-RestMethod -Uri "https://tailscalerdp-production.up.railway.app/api/update-rdp" -Method Post -Body $payload -ContentType 'application/json'
+          
+          Write-Host "Data berhasil terkirim ke Web Dashboard!"
+
+      - name: CEK RDP DI WEB DASHBOARD
+        run: |
+          Write-Host "`n=========================================";
+          Write-Host "RDP BERHASIL DIBUAT DAN DATA TERKIRIM!";
+          Write-Host "Silakan cek IP dan Password kamu di link ini:";
+          Write-Host "👉 https://tailscalerdp-production.up.railway.app/";
+          Write-Host "=========================================`n";
 
       - name: Maintain Connection
         run: |
